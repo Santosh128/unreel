@@ -26,13 +26,16 @@ import java.util.Arrays;
  *  - Views that report item indexes count each time they settle on a single item further
  *    down than any seen before.
  *  - Views without indexes (YouTube Shorts) must have a reel word in their own view id. They
- *    count one per burst of scroll events, and only when the view actually moved. Players fire motionless scroll events while opening and
- *    loading; counting those caused double counts.
+ *    count one per burst of scroll events, and only when the view actually moved. Players fire
+ *    motionless scroll events while opening and loading; counting those caused double counts.
  *  - For views without indexes, nothing counts within MIN_COUNT_GAP_MS of the previous count.
  *
- * Scrolling a normal feed (3+ items visible) means you left the reel player, so the next
- * reel event counts as a fresh opening. The session also resets on app switch and after
- * SESSION_IDLE_MS without scrolling.
+ * You have left the reel player, and the next reel event counts as a fresh opening, when:
+ *  - a feed scrolls: several items visible in a view whose id isn't a reel view (YouTube's home
+ *    shows only 2 large cards at a time, so "several" means 2+ there), or
+ *  - the view that opened the player is recreated (Shorts reopened from the tab bar without
+ *    scrolling the home feed in between).
+ * The session also resets on app switch and after SESSION_IDLE_MS without scrolling.
  *
  * Debug with: adb logcat -s Unreel
  */
@@ -76,6 +79,9 @@ public class ReelAccessibilityService extends AccessibilityService {
     private String sessionKey = "";
     // Whether the reel on screen when the player opened has been counted
     private boolean inPlayer = false;
+    // The non-indexed view that opened the player (YouTube: reel_recycler) and its node identity
+    private String openerViewId = null;
+    private int openerNode = 0;
     // Furthest item index seen per scrolling view (for views that report indexes)
     private final Map<Integer, Integer> maxIndexByView = new HashMap<>();
     private long lastScrollAt = 0;
@@ -109,7 +115,9 @@ public class ReelAccessibilityService extends AccessibilityService {
 
             boolean counted;
             boolean indexed = from >= 0 && to >= 0;
-            if (from >= 0 && to - from >= 2) {
+            String viewId = source.getViewIdResourceName();
+            boolean reelView = matches(viewId);
+            if (indexed && (to - from >= 2 || (to > from && !reelView))) {
                 // A feed, not a reel player: the next reel event is a fresh opening
                 inPlayer = false;
                 maxIndexByView.clear();
@@ -117,15 +125,17 @@ public class ReelAccessibilityService extends AccessibilityService {
             } else if (indexed) {
                 counted = countByIndex(source.hashCode(), from, to);
                 inPlayer = true;
-            } else if (!matches(source.getViewIdResourceName())) {
+            } else if (!reelView) {
                 // Without indexes there is little to go on, so the scrolling view itself must be
                 // a reel player (YouTube: reel_recycler, reel_player_underlay). A reel word
                 // elsewhere on screen, like a Play Store listing, is not enough.
                 counted = false;
-            } else if (!inPlayer) {
-                counted = true; // the reel shown when the player opened
+            } else if (!inPlayer || (viewId.equals(openerViewId) && source.hashCode() != openerNode)) {
+                counted = true; // the reel shown when the player opened (or was reopened)
                 inPlayer = true;
                 burstCounted = true;
+                openerViewId = viewId;
+                openerNode = source.hashCode();
             } else {
                 counted = !burstCounted && hasMoved(event);
                 if (counted) burstCounted = true;
@@ -135,7 +145,7 @@ public class ReelAccessibilityService extends AccessibilityService {
             // next reel ~200ms after leaving the last one), so the time gap only guards the rest
             if (counted && !indexed && now - lastCountAt < MIN_COUNT_GAP_MS) counted = false;
             Log.d(TAG, pkg + " from=" + from + " to=" + to + " y=" + event.getScrollY()
-                + " id=" + source.getViewIdResourceName() + " counted=" + counted);
+                + " id=" + viewId + " node=" + source.hashCode() + " counted=" + counted);
             if (counted) {
                 lastCountAt = now;
                 ReelStore.record(this, appName(pkg));
@@ -169,6 +179,8 @@ public class ReelAccessibilityService extends AccessibilityService {
     private void resetSession(String key) {
         sessionKey = key;
         inPlayer = false;
+        openerViewId = null;
+        openerNode = 0;
         maxIndexByView.clear();
         markerCheckedAt = 0;
         lastScrollAt = 0;
