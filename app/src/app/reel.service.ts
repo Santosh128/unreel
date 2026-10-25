@@ -31,6 +31,12 @@ function storageGet(key: string): string | null {
   }
 }
 
+function storageRemove(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {}
+}
+
 function storageSet(key: string, value: string) {
   try {
     localStorage.setItem(key, value);
@@ -47,9 +53,8 @@ export function localDay(date = new Date()): string {
 export class ReelService {
   private http = inject(HttpClient);
 
-  apiUrl =
-    storageGet('unreel.apiUrl') ??
-    (Capacitor.isNativePlatform() ? environment.apiUrl : environment.webApiUrl);
+  private readonly defaultApiUrl = Capacitor.isNativePlatform() ? environment.apiUrl : environment.webApiUrl;
+  apiUrl = storageGet('unreel.apiUrl') ?? this.defaultApiUrl;
   readonly deviceId = this.loadDeviceId();
 
   private loadDeviceId(): string {
@@ -62,8 +67,17 @@ export class ReelService {
   }
 
   setApiUrl(url: string) {
-    this.apiUrl = url.replace(/\/+$/, '');
-    storageSet('unreel.apiUrl', this.apiUrl);
+    // Only remember a URL the user actually changed; otherwise keep following the build's
+    // default, so a new build (e.g. moving from local testing to the server) takes effect.
+    // An empty field also goes back to the default.
+    const cleaned = url.trim().replace(/\/+$/, '');
+    if (!cleaned || cleaned === this.defaultApiUrl) {
+      this.apiUrl = this.defaultApiUrl;
+      storageRemove('unreel.apiUrl');
+    } else {
+      this.apiUrl = cleaned;
+      storageSet('unreel.apiUrl', cleaned);
+    }
   }
 
   private get headers() {
