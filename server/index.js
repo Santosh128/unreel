@@ -23,7 +23,8 @@ app.get('/health', async (req, res) => {
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// Every request identifies the phone with an X-Device-Id header.
+// Every request identifies the phone with an X-Device-Id header. Each device has its own
+// counts, limit and history; on Android the id comes from ANDROID_ID so it survives reinstalls.
 // The day comes from the client so "today" follows the phone's timezone.
 app.use('/api', (req, res, next) => {
   const deviceId = req.get('X-Device-Id');
@@ -68,6 +69,13 @@ async function readLimit(deviceId) {
 app.get('/api/today', async (req, res) => {
   const day = getDay(req, res);
   if (!day) return;
+  // The app loads "today" on every open, so this keeps the device list current
+  const model = req.get('X-Device-Model')?.slice(0, 100) || null;
+  await pool.query(
+    `INSERT INTO devices (device_id, model) VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE model = COALESCE(VALUES(model), model), last_seen = CURRENT_TIMESTAMP`,
+    [req.deviceId, model],
+  );
   res.json({
     day,
     count: await readCount(req.deviceId, day),
@@ -101,6 +109,42 @@ app.post('/api/reels/undo', async (req, res) => {
     [req.deviceId, day],
   );
   res.json({ day, count: await readCount(req.deviceId, day) });
+});
+
+// Move another device id's data onto this one (used once when an app install switches from a
+// random id to its stable Android id). Counts for the same day and app are added together.
+app.post('/api/device/merge', async (req, res) => {
+  const from = String(req.body.from ?? '');
+  if (!from || from.length > 64 || from === req.deviceId) {
+    return res.status(400).json({ error: 'from must be a different device id' });
+  }
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [moved] = await conn.query(
+      `INSERT INTO reel_counts (device_id, day, source, count)
+       SELECT ?, s.day, s.source, s.count
+       FROM (SELECT day, source, count FROM reel_counts WHERE device_id = ?) s
+       ON DUPLICATE KEY UPDATE count = reel_counts.count + s.count`,
+      [req.deviceId, from],
+    );
+    await conn.query('DELETE FROM reel_counts WHERE device_id = ?', [from]);
+    // Keep this device's limit if it has one, otherwise take the old one
+    await conn.query(
+      `INSERT IGNORE INTO settings (device_id, daily_limit)
+       SELECT ?, daily_limit FROM settings WHERE device_id = ?`,
+      [req.deviceId, from],
+    );
+    await conn.query('DELETE FROM settings WHERE device_id = ?', [from]);
+    await conn.query('DELETE FROM devices WHERE device_id = ?', [from]);
+    await conn.commit();
+    res.json({ merged: moved.affectedRows > 0 });
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 });
 
 // Clear a day's counts for every source

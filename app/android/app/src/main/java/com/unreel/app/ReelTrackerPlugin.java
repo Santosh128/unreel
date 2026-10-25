@@ -2,6 +2,7 @@ package com.unreel.app;
 
 import android.content.ComponentName;
 import android.content.Intent;
+import android.os.Build;
 import android.provider.Settings;
 import android.text.TextUtils;
 
@@ -34,6 +35,15 @@ public class ReelTrackerPlugin extends Plugin implements ReelStore.Listener {
         }
         ReelStore.configure(getContext(), apiUrl, deviceId);
         call.resolve();
+    }
+
+    /** Stable per-device id (ANDROID_ID survives reinstalls; unique per device and signing key). */
+    @PluginMethod
+    public void deviceInfo(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("id", Settings.Secure.getString(getContext().getContentResolver(), Settings.Secure.ANDROID_ID));
+        ret.put("model", Build.MANUFACTURER + " " + Build.MODEL);
+        call.resolve(ret);
     }
 
     @PluginMethod

@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Capacitor } from '@capacitor/core';
 import { environment } from '../environments/environment';
+import { ReelTracker } from './reel-tracker';
 
 export interface DayCount {
   day: string;
@@ -55,15 +56,44 @@ export class ReelService {
 
   private readonly defaultApiUrl = Capacitor.isNativePlatform() ? environment.apiUrl : environment.webApiUrl;
   apiUrl = storageGet('unreel.apiUrl') ?? this.defaultApiUrl;
-  readonly deviceId = this.loadDeviceId();
+  deviceId = '';
+  deviceModel = '';
 
-  private loadDeviceId(): string {
-    let id = storageGet('unreel.deviceId');
-    if (!id) {
-      id = crypto.randomUUID();
-      storageSet('unreel.deviceId', id);
+  /**
+   * Works out which device this is; runs before the app starts (see app.config.ts).
+   * Browsers keep a random id in storage. Android uses the stable ANDROID_ID, and if this install
+   * used a random id before, that id's data is merged into the stable one once.
+   */
+  async init() {
+    const stored = storageGet('unreel.deviceId');
+    if (Capacitor.getPlatform() === 'android') {
+      try {
+        const info = await ReelTracker.deviceInfo();
+        this.deviceModel = info.model;
+        if (info.id) {
+          const stable = `android-${info.id}`;
+          if (stored && stored !== stable) {
+            this.deviceId = stable;
+            try {
+              await firstValueFrom(
+                this.http.post(`${this.apiUrl}/device/merge`, { from: stored }, { headers: this.headers }),
+              );
+            } catch {
+              // Server unreachable: stay on the old id and try the merge on the next start
+              this.deviceId = stored;
+              return;
+            }
+          }
+          this.deviceId = stable;
+          storageSet('unreel.deviceId', stable);
+          return;
+        }
+      } catch {
+        // Older native build without deviceInfo: fall through to the stored id
+      }
     }
-    return id;
+    this.deviceId = stored ?? crypto.randomUUID();
+    storageSet('unreel.deviceId', this.deviceId);
   }
 
   setApiUrl(url: string) {
@@ -81,7 +111,9 @@ export class ReelService {
   }
 
   private get headers() {
-    return new HttpHeaders({ 'X-Device-Id': this.deviceId });
+    const headers: Record<string, string> = { 'X-Device-Id': this.deviceId };
+    if (this.deviceModel) headers['X-Device-Model'] = this.deviceModel;
+    return new HttpHeaders(headers);
   }
 
   today() {

@@ -26,6 +26,8 @@ export class AppComponent implements OnInit, OnDestroy {
   showSettings = signal(false);
 
   apiUrlInput = this.reels.apiUrl;
+  readonly deviceId = this.reels.deviceId;
+  readonly deviceModel = this.reels.deviceModel;
   limitInput = 20;
 
   private currentDay = localDay();

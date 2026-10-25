@@ -3,6 +3,7 @@ import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 /** Native Android plugin (android/.../ReelTrackerPlugin.java) that auto-counts reels. */
 export interface ReelTrackerPlugin {
   configure(options: { apiUrl: string; deviceId: string }): Promise<void>;
+  deviceInfo(): Promise<{ id: string | null; model: string }>;
   status(): Promise<{ enabled: boolean; pending: number }>;
   openSettings(): Promise<void>;
   flush(): Promise<void>;

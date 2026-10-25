@@ -9,7 +9,15 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  h1 { font-size: 22px; margin: 0; letter-spacing: -0.02em; }
+  h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 22px;
+    margin: 0;
+    letter-spacing: -0.02em;
+    img { border-radius: 7px; }
+  }
 }
 
 button {
@@ -52,6 +60,7 @@ button {
 }
 
 .muted { color: var(--muted); font-size: 13px; }
+.device { margin: 0; line-height: 1.5; }
 
 .settings {
   display: grid;

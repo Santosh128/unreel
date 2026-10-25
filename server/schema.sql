@@ -8,6 +8,14 @@ CREATE TABLE IF NOT EXISTS reel_counts (
   PRIMARY KEY (device_id, day, source)
 );
 
+-- One row per phone/browser, so devices can be told apart
+CREATE TABLE IF NOT EXISTS devices (
+  device_id  VARCHAR(64)  NOT NULL PRIMARY KEY,
+  model      VARCHAR(100) NULL,
+  first_seen TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_seen  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS settings (
   device_id   VARCHAR(64)  NOT NULL PRIMARY KEY,
   daily_limit INT UNSIGNED NOT NULL DEFAULT 20
