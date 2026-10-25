@@ -63,6 +63,16 @@ public class ReelTrackerPlugin extends Plugin implements ReelStore.Listener {
         call.resolve();
     }
 
+    /** Unreel's App info page, where "Allow restricted settings" lives for APK installs. */
+    @PluginMethod
+    public void openAppInfo(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            android.net.Uri.fromParts("package", getContext().getPackageName(), null));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        call.resolve();
+    }
+
     @PluginMethod
     public void flush(PluginCall call) {
         ReelStore.flush(getContext());

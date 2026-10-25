@@ -155,6 +155,13 @@ button {
   p { margin: 0; line-height: 1.45; }
 }
 
+.restricted {
+  summary { color: var(--accent); font-size: 14px; cursor: pointer; padding: 4px 0; }
+  p { margin: 8px 0 0; }
+  ol { margin: 6px 0 12px; padding-left: 20px; line-height: 1.5; }
+  button { width: 100%; }
+}
+
 .auto-on {
   text-align: center;
   color: var(--ok);

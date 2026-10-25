@@ -121,6 +121,10 @@ export class AppComponent implements OnInit, OnDestroy {
     ReelTracker.openSettings();
   }
 
+  openAppInfo() {
+    ReelTracker.openAppInfo();
+  }
+
   async load() {
     this.currentDay = localDay();
     try {

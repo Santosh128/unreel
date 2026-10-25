@@ -7,6 +7,7 @@ export interface ReelTrackerPlugin {
   status(): Promise<{ enabled: boolean; pending: number; skipAds: boolean }>;
   setSkipAds(options: { enabled: boolean }): Promise<void>;
   openSettings(): Promise<void>;
+  openAppInfo(): Promise<void>;
   flush(): Promise<void>;
   clearPending(): Promise<void>;
   addListener(event: 'reel', fn: (data: { app: string }) => void): Promise<PluginListenerHandle>;

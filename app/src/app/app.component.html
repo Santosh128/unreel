@@ -45,7 +45,19 @@
           "Downloaded apps").
         </p>
       </div>
-      <button class="primary" (click)="enableAutoCounting()">Open settings</button>
+      <button class="primary" (click)="enableAutoCounting()">Open Accessibility settings</button>
+      <details class="restricted">
+        <summary>Switch greyed out or "Restricted setting"?</summary>
+        <p class="muted">
+          Android blocks this for apps installed from an APK file. To allow it:
+        </p>
+        <ol class="muted">
+          <li>Try turning <b>Unreel reel counter</b> on once and tap <b>OK</b> on the message.</li>
+          <li>Open App info below, tap <b>⋮</b> (top right) → <b>Allow restricted settings</b>, and confirm.</li>
+          <li>Go back to Accessibility and turn <b>Unreel reel counter</b> on.</li>
+        </ol>
+        <button (click)="openAppInfo()">Open Unreel App info</button>
+      </details>
     </section>
   }
   <button class="counter" [class.over]="overLimit()" (click)="add()" [disabled]="busy()">

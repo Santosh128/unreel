@@ -45,8 +45,12 @@ YouTube Shorts, TikTok, Snapchat Spotlight, Moj, Josh, ShareChat, and any other 
 "reel", "clips" or "shorts". Counts are queued on the phone and uploaded when the server can be reached,
 tagged with the app's name.
 
-To turn it on: open the app → **Open settings** → Accessibility → **Unreel reel counter** → On.
-On Android 13+ with a sideloaded APK, first go to App info → ⋮ → **Allow restricted settings**.
+To turn it on: open the app → **Open Accessibility settings** → **Unreel reel counter** → On.
+
+**Installed from an APK file?** Android 13+ greys the switch out ("Restricted setting"). Try to turn it on once
+and tap OK, then Settings → Apps → Unreel → **⋮** → **Allow restricted settings**, confirm, and turn it on again.
+The app shows these steps (and an App info button) under "Switch greyed out?". Installing through adb, Android
+Studio or the Play Store isn't restricted.
 
 ## YouTube ad skipping (Android)
 
