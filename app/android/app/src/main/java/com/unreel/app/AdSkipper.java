@@ -139,8 +139,10 @@ final class AdSkipper {
 
     private void mute() {
         if (audio == null || mutedByUs) return;
-        // Leave it alone if the user muted media themselves, so we never unmute their choice
-        if (audio.isStreamMute(AudioManager.STREAM_MUSIC)) return;
+        // Leave it alone if the user muted media themselves (mute switch or volume at 0;
+        // isStreamMute doesn't report volume 0), so we never touch their choice
+        if (audio.isStreamMute(AudioManager.STREAM_MUSIC)
+                || audio.getStreamVolume(AudioManager.STREAM_MUSIC) == 0) return;
         audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0);
         mutedByUs = true;
         Log.d(TAG, "muted ad");
