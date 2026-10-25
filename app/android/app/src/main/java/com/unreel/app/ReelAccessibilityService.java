@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityService;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Rect;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.Log;
 import android.view.accessibility.AccessibilityEvent;
@@ -28,7 +30,11 @@ import java.util.Arrays;
  *  - Views without indexes (YouTube Shorts) must have a reel word in their own view id. They
  *    count one per burst of scroll events, and only when the view actually moved. Players fire
  *    motionless scroll events while opening and loading; counting those caused double counts.
- *  - For views without indexes, nothing counts within MIN_COUNT_GAP_MS of the previous count.
+ *  - For views without indexes, nothing counts within MIN_COUNT_GAP_MS of the previous count,
+ *    and the count waits until the swipe settles: if the reel on screen can be identified
+ *    (YouTube: channel + caption) and was already seen this session, it doesn't count again.
+ *    Scroll direction can't be used instead: real finger swipes report the opposite sign to
+ *    simulated ones.
  *
  * You have left the reel player, and the next reel event counts as a fresh opening, when:
  *  - a feed scrolls: several items visible in a view whose id isn't a reel view (YouTube's home
@@ -87,6 +93,12 @@ public class ReelAccessibilityService extends AccessibilityService {
     private long lastScrollAt = 0;
     private long lastCountAt = 0;
     private boolean burstCounted = false;
+    // Reels already counted in this player session, by on-screen fingerprint
+    private final Set<String> seenReels = new HashSet<>();
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private static final long SETTLE_MS = 1000;
+    // Fingerprint of the reel shown before the latest swipe
+    private String currentReel = null;
     private long markerCheckedAt = 0;
     private boolean markerFound = false;
 
@@ -120,6 +132,7 @@ public class ReelAccessibilityService extends AccessibilityService {
             if (indexed && (to - from >= 2 || (to > from && !reelView))) {
                 // A feed, not a reel player: the next reel event is a fresh opening
                 inPlayer = false;
+                seenReels.clear();
                 maxIndexByView.clear();
                 counted = false;
             } else if (indexed) {
@@ -133,6 +146,7 @@ public class ReelAccessibilityService extends AccessibilityService {
             } else if (!inPlayer || (viewId.equals(openerViewId) && source.hashCode() != openerNode)) {
                 counted = true; // the reel shown when the player opened (or was reopened)
                 inPlayer = true;
+                seenReels.clear();
                 burstCounted = true;
                 openerViewId = viewId;
                 openerNode = source.hashCode();
@@ -148,16 +162,72 @@ public class ReelAccessibilityService extends AccessibilityService {
                 + " id=" + viewId + " node=" + source.hashCode() + " counted=" + counted);
             if (counted) {
                 lastCountAt = now;
-                ReelStore.record(this, appName(pkg));
+                if (indexed) ReelStore.record(this, appName(pkg));
+                else countIfNew(pkg);
             }
         } finally {
             source.recycle();
         }
     }
 
+    // Only the scroll offset: events with offset 0 but a scroll delta come from taps and player
+    // UI changes, not swipes (every real swipe on YouTube starts with a non-zero offset)
     private static boolean hasMoved(AccessibilityEvent event) {
-        if (event.getScrollY() != 0 || event.getScrollX() != 0) return true;
-        return android.os.Build.VERSION.SDK_INT >= 28 && event.getScrollDeltaY() != 0;
+        return event.getScrollY() != 0 || event.getScrollX() != 0;
+    }
+
+    /** Counts the reel on screen once the swipe settles, unless it was already seen. */
+    private void countIfNew(String pkg) {
+        String session = sessionKey;
+        handler.postDelayed(() -> {
+            if (!session.equals(sessionKey)) return;
+            String id = reelFingerprint(getRootInActiveWindow());
+            // Reading the same reel as before the swipe means the screen hadn't updated (or the new
+            // reel has no labels): treat it as unknown and count, rather than miss a new reel
+            if (id != null && id.equals(currentReel)) id = null;
+            currentReel = id;
+            if (id != null && !seenReels.add(id)) {
+                Log.d(TAG, pkg + " already seen, not counted: " + id);
+                return;
+            }
+            Log.d(TAG, pkg + " counted reel: " + id);
+            ReelStore.record(this, appName(pkg));
+        }, SETTLE_MS);
+    }
+
+    /**
+     * Identifies the reel on screen from its labels, or null if it can't. YouTube Shorts:
+     * "Go to channel @name" followed by the caption; ads: the advertiser label ending in "Ad".
+     */
+    private static String reelFingerprint(AccessibilityNodeInfo root) {
+        if (root == null) return null;
+        ArrayDeque<AccessibilityNodeInfo> stack = new ArrayDeque<>();
+        stack.push(root);
+        String channel = null;
+        String result = null;
+        int visited = 0;
+        while (!stack.isEmpty()) {
+            AccessibilityNodeInfo node = stack.pop();
+            if (result == null && visited++ < MAX_NODES * 2) {
+                // YouTube keeps the previous and next Shorts loaded off-screen; only read the one shown
+                CharSequence cs = node.isVisibleToUser() ? node.getContentDescription() : null;
+                String desc = cs == null ? "" : cs.toString();
+                if (channel == null && desc.startsWith("Go to channel")) {
+                    channel = desc;
+                } else if (channel != null && !desc.isEmpty() && !desc.startsWith("Subscribe")) {
+                    result = channel + "|" + desc; // caption follows the channel
+                } else if (channel == null && desc.endsWith("\nAd")) {
+                    result = desc;
+                }
+                // Depth-first in screen order: push children in reverse
+                for (int i = node.getChildCount() - 1; i >= 0; i--) {
+                    AccessibilityNodeInfo child = node.getChild(i);
+                    if (child != null) stack.push(child);
+                }
+            }
+            node.recycle();
+        }
+        return result != null ? result : channel;
     }
 
     private boolean countByIndex(int viewKey, int from, int to) {
@@ -181,6 +251,8 @@ public class ReelAccessibilityService extends AccessibilityService {
         inPlayer = false;
         openerViewId = null;
         openerNode = 0;
+        seenReels.clear();
+        currentReel = null;
         maxIndexByView.clear();
         markerCheckedAt = 0;
         lastScrollAt = 0;
