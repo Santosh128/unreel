@@ -1,0 +1,126 @@
+<header>
+  <h1>Unreel</h1>
+  <button class="icon" (click)="showSettings.set(!showSettings())" aria-label="Settings">⚙</button>
+</header>
+
+@if (error()) {
+  <div class="error" (click)="load()">{{ error() }} · tap to retry</div>
+}
+
+@if (showSettings()) {
+  <section class="card settings">
+    <label>
+      Daily limit
+      <input type="number" min="1" max="1000" [(ngModel)]="limitInput" />
+    </label>
+    <label>
+      Server URL
+      <input type="url" [(ngModel)]="apiUrlInput" placeholder="http://192.168.x.x:3000/api" />
+    </label>
+    <button class="primary" (click)="saveSettings()" [disabled]="busy()">Save</button>
+  </section>
+}
+
+<main>
+  @if (autoEnabled() === false) {
+    <section class="card auto">
+      <div>
+        <h2>Turn on auto counting</h2>
+        <p class="muted">
+          Count reels automatically in Instagram, Facebook, YouTube and other apps. Turn on
+          <b>Unreel reel counter</b> under Accessibility (it may be listed under "Installed apps" or
+          "Downloaded apps").
+        </p>
+      </div>
+      <button class="primary" (click)="enableAutoCounting()">Open settings</button>
+    </section>
+  }
+  <button class="counter" [class.over]="overLimit()" (click)="add()" [disabled]="busy()">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <circle class="track" cx="100" cy="100" r="88" />
+      <circle
+        class="bar"
+        cx="100"
+        cy="100"
+        r="88"
+        [attr.stroke-dasharray]="ring"
+        [attr.stroke-dashoffset]="ring * (1 - progress())"
+      />
+    </svg>
+    <span class="num">{{ count() }}</span>
+    <span class="sub">of {{ limit() }} today</span>
+    <span class="hint">tap to add a reel</span>
+  </button>
+
+  @if (autoEnabled()) {
+    <p class="auto-on">
+      ● Auto counting on
+      @if (pending()) {
+        · {{ pending() }} waiting to sync
+      }
+    </p>
+  }
+
+  <p class="status" [class.over]="overLimit()">
+    @if (overLimit()) {
+      Limit reached. Time to put the phone down.
+    } @else {
+      {{ limit() - count() }} left before your limit
+    }
+  </p>
+
+  <div class="actions">
+    <button (click)="undo()" [disabled]="busy() || count() === 0">− Undo</button>
+    <button (click)="add(5)" [disabled]="busy()">+5</button>
+    <button class="danger" (click)="reset()" [disabled]="busy() || count() === 0">Reset today</button>
+  </div>
+
+  @if (sources().length) {
+    <section class="card">
+      <h2>Today by app</h2>
+      @for (s of sources(); track s.source) {
+        <div class="row">
+          <span>{{ sourceName(s.source) }}</span>
+          <span>{{ s.count }}</span>
+        </div>
+      }
+    </section>
+  }
+
+  <section class="card">
+    <div class="card-head">
+      <h2>Last 7 days</h2>
+      <span class="muted">avg {{ weekAvg() }}/day</span>
+    </div>
+    <div class="chart">
+      @for (d of week(); track d.day) {
+        <div class="col">
+          <span class="val">{{ d.count }}</span>
+          <div class="bar-wrap">
+            <div class="bar" [class.over]="d.count >= limit()" [style.height.%]="(d.count / weekMax()) * 100"></div>
+          </div>
+          <span class="lbl">{{ d.day | date: 'EEE' }}</span>
+        </div>
+      }
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>History</h2>
+    @for (h of history(); track h.day) {
+      <div class="day">
+        <div class="day-head">
+          <span>{{ h.day | date: 'EEE, d MMM' }}</span>
+          <span class="total" [class.over-text]="h.count >= limit()">{{ h.count }}</span>
+        </div>
+        <div class="chips">
+          @for (s of h.sources; track s.source) {
+            <span class="chip">{{ sourceName(s.source) }} <b>{{ s.count }}</b></span>
+          }
+        </div>
+      </div>
+    } @empty {
+      <p class="muted">No reels counted yet.</p>
+    }
+  </section>
+</main>

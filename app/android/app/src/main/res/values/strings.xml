@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Unreel</string>
+    <string name="title_activity_main">Unreel</string>
+    <string name="package_name">com.unreel.app</string>
+    <string name="custom_url_scheme">com.unreel.app</string>
+    <string name="accessibility_label">Unreel reel counter</string>
+    <string name="accessibility_description">Counts the reels and shorts you swipe through in Instagram, Facebook, YouTube and other apps. Unreel only reads whether a reel player is on screen and when you swipe; it does not record what you watch or type.</string>
+</resources>
