@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { Capacitor } from '@capacitor/core';
 import { environment } from '../environments/environment';
 
 export interface DayCount {
@@ -46,7 +47,9 @@ export function localDay(date = new Date()): string {
 export class ReelService {
   private http = inject(HttpClient);
 
-  apiUrl = storageGet('unreel.apiUrl') ?? environment.apiUrl;
+  apiUrl =
+    storageGet('unreel.apiUrl') ??
+    (Capacitor.isNativePlatform() ? environment.apiUrl : environment.webApiUrl);
   readonly deviceId = this.loadDeviceId();
 
   private loadDeviceId(): string {

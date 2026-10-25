@@ -71,7 +71,7 @@ Put nginx (or Apache) in front with HTTPS and proxy to the Node port:
 
 ```nginx
 server {
-    server_name unreel.example.com;
+    server_name unreel.genautix.in;
     location / {
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
@@ -81,8 +81,8 @@ server {
 }
 ```
 
-Then `sudo certbot --nginx -d unreel.example.com` for HTTPS. Check it with
-`curl https://unreel.example.com/health` → `{"ok":true}`.
+Then `sudo certbot --nginx -d unreel.genautix.in` for HTTPS. Check it with
+`curl https://unreel.genautix.in/health` → `{"ok":true}`.
 
 **Updating:** `git pull`, rebuild the app if it changed, `cd server && npm ci --omit=dev && npm run db:init && pm2 restart unreel`.
 
