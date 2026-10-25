@@ -48,6 +48,17 @@ tagged with the app's name.
 To turn it on: open the app → **Open settings** → Accessibility → **Unreel reel counter** → On.
 On Android 13+ with a sideloaded APK, first go to App info → ⋮ → **Allow restricted settings**.
 
+## YouTube ad skipping (Android)
+
+The same accessibility service ([AdSkipper.java](app/android/app/src/main/java/com/unreel/app/AdSkipper.java))
+taps YouTube's **Skip** button as soon as it appears and mutes media while an ad plays, restoring the sound
+when the ad ends. Ads still load and unskippable ads still play (silently); only YouTube Premium removes ads.
+It never unmutes media you muted yourself. Skipped ads show as "N YouTube ads skipped today" in the app.
+
+It finds ads by YouTube's view ids (`skip_ad_button`, `ad_progress_text`, `player_learn_more_button`), so a
+YouTube update that renames them can stop it working until the ids are updated. Turn it off in the app under
+⚙ Settings → **Skip & mute YouTube ads**.
+
 ## Deploying to a server
 
 The Node server hosts both the API (`/api`) and the built web app, so one process runs everything.
@@ -109,6 +120,7 @@ All requests send an `X-Device-Id` header (the app generates one per install).
 | POST   | `/api/reels`             | `{ day, amount?, source? }` |
 | POST   | `/api/reels/undo`        | `{ day }`            |
 | POST   | `/api/reels/reset`       | `{ day }`            |
+| POST   | `/api/ads/skipped`       | `{ day, amount? }`   |
 | GET    | `/api/history?days=30`   |                      |
 | PUT    | `/api/settings`          | `{ limit }`          |
 | GET    | `/health`                | (no device header)   |
