@@ -5,5 +5,5 @@
     <string name="package_name">com.unreel.app</string>
     <string name="custom_url_scheme">com.unreel.app</string>
     <string name="accessibility_label">Unreel reel counter</string>
-    <string name="accessibility_description">Counts the reels and shorts you swipe through in Instagram, Facebook, YouTube and other apps. Unreel only reads whether a reel player is on screen and when you swipe; it does not record what you watch or type.</string>
+    <string name="accessibility_description">Counts the reels and shorts you swipe through in Instagram, Facebook, YouTube and other apps. It can also tap Skip on YouTube ads and mute ads while they play. Unreel only reads whether a reel or ad is on screen and when you swipe; it does not record what you watch or type.</string>
 </resources>

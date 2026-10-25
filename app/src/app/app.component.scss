@@ -190,3 +190,27 @@ button {
   padding: 4px 10px;
   b { color: var(--text); font-weight: 600; margin-left: 2px; }
 }
+
+.ads {
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.settings .switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 15px;
+  span { display: grid; gap: 2px; }
+  input {
+    width: 44px;
+    height: 26px;
+    flex: none;
+    padding: 0;
+    accent-color: var(--accent);
+  }
+}

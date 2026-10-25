@@ -17,19 +17,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Queues auto-counted reels on the phone and uploads them to the API.
- * Counts stay queued (keyed "day|app") until the server accepts them,
+ * Queues auto-counted reels (keyed "day|app") and skipped YouTube ads (keyed "day") on the
+ * phone and uploads them to the API. Counts stay queued until the server accepts them,
  * so nothing is lost while the server is unreachable.
  */
 public final class ReelStore {
 
     private static final String PREFS = "unreel";
     private static final String PENDING = "unreel.pending";
+    private static final String PENDING_ADS = "unreel.pendingAds";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
 
     public interface Listener {
         void onReel(String app);
         void onSynced();
+        void onAdSkipped();
     }
 
     private static volatile Listener listener;
@@ -53,6 +55,17 @@ public final class ReelStore {
         }
         Listener l = listener;
         if (l != null) l.onReel(app);
+        flush(ctx);
+    }
+
+    public static void recordAdSkip(Context ctx) {
+        String key = today();
+        synchronized (ReelStore.class) {
+            SharedPreferences p = ctx.getSharedPreferences(PENDING_ADS, Context.MODE_PRIVATE);
+            p.edit().putInt(key, p.getInt(key, 0) + 1).apply();
+        }
+        Listener l = listener;
+        if (l != null) l.onAdSkipped();
         flush(ctx);
     }
 
@@ -82,14 +95,32 @@ public final class ReelStore {
         String deviceId = config.getString("deviceId", null);
         if (apiUrl == null || deviceId == null) return;
 
-        SharedPreferences pending = ctx.getSharedPreferences(PENDING, Context.MODE_PRIVATE);
+        boolean sent;
+        try {
+            sent = uploadQueue(ctx, PENDING, apiUrl + "/reels", deviceId);
+            sent |= uploadQueue(ctx, PENDING_ADS, apiUrl + "/ads/skipped", deviceId);
+        } catch (Exception e) {
+            return; // server unreachable: everything stays queued for the next flush
+        }
+        Listener l = listener;
+        if (sent && l != null) l.onSynced();
+    }
+
+    /** Uploads one queue; throws when a request fails so the rest waits for a retry. */
+    private static boolean uploadQueue(Context ctx, String queue, String url, String deviceId) throws Exception {
+        SharedPreferences pending = ctx.getSharedPreferences(queue, Context.MODE_PRIVATE);
         boolean sent = false;
         for (Map.Entry<String, ?> e : pending.getAll().entrySet()) {
             if (!(e.getValue() instanceof Integer)) continue;
             int amount = (Integer) e.getValue();
+            if (amount <= 0) continue;
+            // Reel keys are "day|app"; ad keys are just "day"
             String[] parts = e.getKey().split("\\|", 2);
-            if (amount <= 0 || parts.length != 2) continue;
-            if (!post(apiUrl, deviceId, parts[0], parts[1], amount)) return; // retry later
+            JSONObject body = new JSONObject();
+            body.put("day", parts[0]);
+            body.put("amount", amount);
+            if (parts.length == 2) body.put("source", parts[1]);
+            if (!post(url, deviceId, body)) throw new Exception("upload failed");
             synchronized (ReelStore.class) {
                 // Subtract what was sent; more may have been recorded meanwhile
                 int left = pending.getInt(e.getKey(), 0) - amount;
@@ -98,19 +129,13 @@ public final class ReelStore {
             }
             sent = true;
         }
-        Listener l = listener;
-        if (sent && l != null) l.onSynced();
+        return sent;
     }
 
-    private static boolean post(String apiUrl, String deviceId, String day, String app, int amount) {
+    private static boolean post(String url, String deviceId, JSONObject body) {
         HttpURLConnection conn = null;
         try {
-            JSONObject body = new JSONObject();
-            body.put("day", day);
-            body.put("source", app);
-            body.put("amount", amount);
-
-            conn = (HttpURLConnection) new URL(apiUrl + "/reels").openConnection();
+            conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setRequestMethod("POST");
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);

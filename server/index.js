@@ -52,6 +52,11 @@ async function readCount(deviceId, day) {
   return Number(rows[0].count);
 }
 
+async function readAdsSkipped(deviceId, day) {
+  const [rows] = await pool.query('SELECT count FROM ad_skips WHERE device_id = ? AND day = ?', [deviceId, day]);
+  return rows[0]?.count ?? 0;
+}
+
 async function readSources(deviceId, day) {
   const [rows] = await pool.query(
     `SELECT source, count FROM reel_counts
@@ -81,6 +86,7 @@ app.get('/api/today', async (req, res) => {
     count: await readCount(req.deviceId, day),
     limit: await readLimit(req.deviceId),
     sources: await readSources(req.deviceId, day),
+    adsSkipped: await readAdsSkipped(req.deviceId, day),
   });
 });
 
@@ -96,6 +102,19 @@ app.post('/api/reels', async (req, res) => {
     [req.deviceId, day, source, amount],
   );
   res.json({ day, count: await readCount(req.deviceId, day) });
+});
+
+// YouTube ads skipped by the Android app (sent in batches when it comes online)
+app.post('/api/ads/skipped', async (req, res) => {
+  const day = getDay(req, res);
+  if (!day) return;
+  const amount = Math.min(Math.max(parseInt(req.body.amount ?? 1, 10) || 1, 1), 500);
+  await pool.query(
+    `INSERT INTO ad_skips (device_id, day, count) VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE count = count + VALUES(count)`,
+    [req.deviceId, day, amount],
+  );
+  res.json({ day, adsSkipped: await readAdsSkipped(req.deviceId, day) });
 });
 
 // Undo one reel from the most recently updated source
@@ -129,6 +148,13 @@ app.post('/api/device/merge', async (req, res) => {
       [req.deviceId, from],
     );
     await conn.query('DELETE FROM reel_counts WHERE device_id = ?', [from]);
+    await conn.query(
+      `INSERT INTO ad_skips (device_id, day, count)
+       SELECT ?, s.day, s.count FROM (SELECT day, count FROM ad_skips WHERE device_id = ?) s
+       ON DUPLICATE KEY UPDATE count = ad_skips.count + s.count`,
+      [req.deviceId, from],
+    );
+    await conn.query('DELETE FROM ad_skips WHERE device_id = ?', [from]);
     // Keep this device's limit if it has one, otherwise take the old one
     await conn.query(
       `INSERT IGNORE INTO settings (device_id, daily_limit)

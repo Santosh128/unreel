@@ -18,6 +18,7 @@ export interface SourceCount {
 export interface Today extends DayCount {
   limit: number;
   sources: SourceCount[];
+  adsSkipped: number;
 }
 
 export interface HistoryDay extends DayCount {

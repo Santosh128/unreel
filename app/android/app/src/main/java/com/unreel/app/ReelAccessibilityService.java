@@ -102,6 +102,13 @@ public class ReelAccessibilityService extends AccessibilityService {
     private long markerCheckedAt = 0;
     private boolean markerFound = false;
 
+    private AdSkipper adSkipper;
+
+    @Override
+    protected void onServiceConnected() {
+        adSkipper = new AdSkipper(this);
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         CharSequence pkgCs = event.getPackageName();
@@ -109,7 +116,11 @@ public class ReelAccessibilityService extends AccessibilityService {
         String pkg = pkgCs.toString();
         if (IGNORED.contains(pkg) || pkg.contains("launcher")) return;
 
-        if (event.getEventType() != AccessibilityEvent.TYPE_VIEW_SCROLLED) return;
+        // Window changes only matter for skipping YouTube ads; reel counting uses scrolls
+        if (event.getEventType() != AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+            if (adSkipper != null && AdSkipper.PACKAGES.contains(pkg)) adSkipper.onEvent(event);
+            return;
+        }
 
         AccessibilityNodeInfo source = event.getSource();
         if (source == null) return;
@@ -326,5 +337,19 @@ public class ReelAccessibilityService extends AccessibilityService {
     }
 
     @Override
-    public void onInterrupt() {}
+    public void onInterrupt() {
+        if (adSkipper != null) adSkipper.unmute();
+    }
+
+    @Override
+    public boolean onUnbind(android.content.Intent intent) {
+        if (adSkipper != null) adSkipper.unmute();
+        return super.onUnbind(intent);
+    }
+
+    @Override
+    public void onDestroy() {
+        if (adSkipper != null) adSkipper.unmute();
+        super.onDestroy();
+    }
 }

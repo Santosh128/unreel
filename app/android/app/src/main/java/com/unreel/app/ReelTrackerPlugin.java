@@ -51,6 +51,7 @@ public class ReelTrackerPlugin extends Plugin implements ReelStore.Listener {
         JSObject ret = new JSObject();
         ret.put("enabled", isServiceEnabled());
         ret.put("pending", ReelStore.pendingCount(getContext()));
+        ret.put("skipAds", AdSkipper.isEnabled(getContext()));
         call.resolve(ret);
     }
 
@@ -65,6 +66,12 @@ public class ReelTrackerPlugin extends Plugin implements ReelStore.Listener {
     @PluginMethod
     public void flush(PluginCall call) {
         ReelStore.flush(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setSkipAds(PluginCall call) {
+        AdSkipper.setEnabled(getContext(), Boolean.TRUE.equals(call.getBoolean("enabled", true)));
         call.resolve();
     }
 
@@ -93,6 +100,11 @@ public class ReelTrackerPlugin extends Plugin implements ReelStore.Listener {
         JSObject data = new JSObject();
         data.put("app", app);
         notifyListeners("reel", data);
+    }
+
+    @Override
+    public void onAdSkipped() {
+        notifyListeners("adSkipped", new JSObject());
     }
 
     @Override

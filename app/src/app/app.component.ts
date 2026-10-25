@@ -21,6 +21,8 @@ export class AppComponent implements OnInit, OnDestroy {
   // null = not on Android, so auto counting isn't available
   autoEnabled = signal<boolean | null>(null);
   pending = signal(0);
+  skipAds = signal(true);
+  adsSkipped = signal(0);
   error = signal('');
   busy = signal(false);
   showSettings = signal(false);
@@ -84,15 +86,17 @@ export class AppComponent implements OnInit, OnDestroy {
     this.listeners.push(
       await ReelTracker.addListener('synced', () => this.scheduleReload()),
       await ReelTracker.addListener('reel', () => this.refreshAutoStatus()),
+      await ReelTracker.addListener('adSkipped', () => this.scheduleReload()),
     );
     await this.refreshAutoStatus();
   }
 
   private async refreshAutoStatus() {
     if (Capacitor.getPlatform() !== 'android') return;
-    const { enabled, pending } = await ReelTracker.status();
+    const { enabled, pending, skipAds } = await ReelTracker.status();
     this.autoEnabled.set(enabled);
     this.pending.set(pending);
+    this.skipAds.set(skipAds ?? true);
   }
 
   // Native sync events can arrive in bursts; reload once they settle
@@ -108,6 +112,11 @@ export class AppComponent implements OnInit, OnDestroy {
     return source === 'manual' ? 'Tapped manually' : source;
   }
 
+  async toggleSkipAds(enabled: boolean) {
+    this.skipAds.set(enabled);
+    await ReelTracker.setSkipAds({ enabled });
+  }
+
   enableAutoCounting() {
     ReelTracker.openSettings();
   }
@@ -120,6 +129,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.limit.set(today.limit);
       this.limitInput = today.limit;
       this.sources.set(today.sources);
+      this.adsSkipped.set(today.adsSkipped ?? 0);
       this.history.set(history);
       this.error.set('');
     } catch {

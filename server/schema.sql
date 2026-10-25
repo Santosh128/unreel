@@ -8,6 +8,14 @@ CREATE TABLE IF NOT EXISTS reel_counts (
   PRIMARY KEY (device_id, day, source)
 );
 
+-- YouTube ads the Android app skipped, per device per day
+CREATE TABLE IF NOT EXISTS ad_skips (
+  device_id VARCHAR(64)  NOT NULL,
+  day       DATE         NOT NULL,
+  count     INT UNSIGNED NOT NULL DEFAULT 0,
+  PRIMARY KEY (device_id, day)
+);
+
 -- One row per phone/browser, so devices can be told apart
 CREATE TABLE IF NOT EXISTS devices (
   device_id  VARCHAR(64)  NOT NULL PRIMARY KEY,

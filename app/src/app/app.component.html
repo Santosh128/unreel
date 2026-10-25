@@ -17,6 +17,15 @@
       Server URL
       <input type="url" [(ngModel)]="apiUrlInput" placeholder="http://192.168.x.x:3000/api" />
     </label>
+    @if (autoEnabled() !== null) {
+      <label class="switch">
+        <span>
+          Skip &amp; mute YouTube ads
+          <small class="muted">Taps Skip as soon as it appears and mutes ads while they play</small>
+        </span>
+        <input type="checkbox" [checked]="skipAds()" (change)="toggleSkipAds($any($event.target).checked)" />
+      </label>
+    }
     <button class="primary" (click)="saveSettings()" [disabled]="busy()">Save</button>
     <p class="muted device">
       Counts are kept separately for each device.<br />
@@ -63,6 +72,10 @@
         · {{ pending() }} waiting to sync
       }
     </p>
+  }
+
+  @if (autoEnabled() !== null && skipAds() && adsSkipped()) {
+    <p class="ads">⏭ {{ adsSkipped() }} YouTube {{ adsSkipped() === 1 ? 'ad' : 'ads' }} skipped today</p>
   }
 
   <p class="status" [class.over]="overLimit()">
